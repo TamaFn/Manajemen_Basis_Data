@@ -1,0 +1,141 @@
+-- student
+-- faculty
+-- class
+-- enrolled
+
+-- Exercise 5.1 halaman 174
+
+-- 1. Find the names of all Juniors (level = JR) who are enrolled in a class taught by Ivana Teach
+
+-- Ivana Teach 
+-- fid = '142519864'
+
+SELECT s.sname, s.age
+FROM student s
+INNER JOIN enrolled e ON s.snum = e.snum
+INNER JOIN class c ON e.cname = c.name
+INNER JOIN faculty f ON c.fid = f.fid
+WHERE f.fname like '%I%Teach'
+AND s.standing = 'JR';
+
+--2. Find the age of the oldest student who is either a History major or enrolled in a course taught by I. Teach.
+
+SELECT MAX(age) AS max_age
+FROM (
+	SELECT sname, age
+	FROM student s 
+	WHERE s.major = 'History'
+	UNION
+	SELECT s.sname, s.age
+	FROM student s
+	INNER JOIN enrolled e ON s.snum = e.snum
+	INNER JOIN class c ON e.cname = c.name
+	INNER JOIN faculty f ON c.fid = f.fid
+	WHERE f.fname like '%I%Teach'
+	AND s.standing = 'JR'
+) AS a
+
+
+-- Menggunakan CTE (Common table expression)
+-- 1. temukan student yang majornya History
+WITH history_student AS 
+(
+	SELECT sname, age
+	FROM student s 
+	WHERE s.major = 'History'
+),
+-- 2. Temukan student yang diajar Ivana Teach
+student_iteach AS
+(
+	SELECT s.sname, s.age
+	FROM student s
+	INNER JOIN enrolled e ON s.snum = e.snum
+	INNER JOIN class c ON e.cname = c.name
+	INNER JOIN faculty f ON c.fid = f.fid
+	WHERE f.fname like '%I%Teach'
+	AND s.standing = 'JR'
+),
+-- 3. Union keduanya
+union_result AS
+(
+	SELECT *
+	FROM history_student
+	UNION
+	SELECT *
+	FROM student_iteach
+)
+-- 4. Query final
+SELECT MAX(age) AS max_age
+FROM union_result
+
+
+-- 3. Find the names of all classes that either meet in room R128 or have five or more students enrolled.
+
+-- Class yang ada di R128
+SELECT name
+FROM class
+WHERE room = 'R128'
+UNION
+-- Jumlah student di kelas >= 5
+SELECT cname
+FROM (
+	SELECT cname, COUNT(snum)
+	FROM enrolled
+	GROUP BY cname
+	HAVING COUNT(snum) >= 5
+) as class_5
+
+-- 4. 
+SELECT s.sname, c.name, c.meets_at
+FROM student s
+INNER JOIN enrolled e ON s.snum = e.snum
+INNER JOIN class c ON e.cname = c.name
+ORDER BY s.sname, c.meets_at
+
+SELECT S.sname, e.cname
+FROM student s
+INNER JOIN enrolled e ON s.snum = e.snum
+WHERE e.cname IN (
+	SELECT name
+	FROM class
+	WHERE meets_at in (
+		-- Slot jadwal dengan kelas lebih dari 1
+		SELECT meets_at
+		FROM (
+			SELECT meets_at, count(meets_at)
+			FROM class 
+			GROUP BY 1
+			HAVING COUNT(meets_at) = 2
+		) AS a
+	)
+)
+
+-- 5. Find the names of faculty members who teach in every room in which some class is taught
+SELECT fname 
+FROM (
+	SELECT fname, COUNT(DISTINCT room) AS jumlah
+	FROM class c
+	INNER JOIN faculty f ON c.fid = f.fid
+	GROUP BY fname
+	HAVING COUNT(DISTINCT room) = (
+		SELECT COUNT(DISTINCT room)
+		FROM class
+	)
+	ORDER BY jumlah desc
+) AS temp
+
+WITH jml_room AS
+(
+	SELECT COUNT(DISTINCT room) AS jumlah
+	FROM class
+),
+faculty_room AS
+(
+	SELECT fname, COUNT(DISTINCT room)
+	FROM class c
+	INNER JOIN faculty f ON c.fid = f.fid
+	GROUP BY fname
+	HAVING COUNT(DISTINCT room) = (SELECT JUMLAH FROM jml_room)
+)
+
+SELECT * FROM faculty_room
